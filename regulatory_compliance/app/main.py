@@ -1,8 +1,13 @@
+from dotenv import load_dotenv
+
+load_dotenv()
+
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from regulatory_compliance.core.config import settings
 from regulatory_compliance.routes.upload_routes import router as upload_router
 from regulatory_compliance.routes.query_routes import router as query_router
+from contextlib import asynccontextmanager
 from regulatory_compliance.utils.exceptions import (
     InvalidFileException,
     DocumentNotFoundException,
@@ -10,9 +15,25 @@ from regulatory_compliance.utils.exceptions import (
     LLMException,
 )
 
-app = FastAPI(title=settings.APP_NAME, version=settings.APP_VERSION)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+
+    print("Application startup completed")
+
+    yield
+
+    print("Application shutdown completed")
+
+
+app = FastAPI(title=settings.APP_NAME, version=settings.APP_VERSION, lifespan=lifespan)
 app.include_router(upload_router)
 app.include_router(query_router)
+
+
+@app.get("/")
+def health():
+    return {"status": "running"}
 
 
 @app.exception_handler(InvalidFileException)

@@ -28,3 +28,8 @@ class UploadRequest(BaseModel):
         description="Name of the uploaded PDF document",
         examples=["RBI_Guidelines.pdf"],
     )
+
+
+class QueryRequest(BaseModel):
+
+    question: str

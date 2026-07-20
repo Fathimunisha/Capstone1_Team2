@@ -2,7 +2,6 @@ from fastapi import APIRouter, File, UploadFile, status
 from regulatory_compliance.models.response import ApiResponse
 from regulatory_compliance.services.upload_service import UploadService
 
-
 router = APIRouter(prefix="/upload", tags=["Upload"])
 
 

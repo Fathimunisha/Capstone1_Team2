@@ -1,16 +1,26 @@
-from typing import Any
-from pydantic import BaseModel, Field
+from typing import List, Optional
+from uuid import UUID
+from pydantic import BaseModel
 
 
 class ApiResponse(BaseModel):
-    """
-    Standard API Response Model
-    """
 
-    success: bool = Field(
-        ..., description="Indicates whether the request was successful"
-    )
+    message: str
 
-    message: str = Field(..., description="Response message")
+    success: bool = True
 
-    data: Any | None = Field(default=None, description="Response payload")
+
+class Source(BaseModel):
+
+    document_id: Optional[str] = None
+
+    chunk_index: Optional[int] = None
+
+    hybrid_score: Optional[float] = None
+
+
+class QueryResponse(BaseModel):
+
+    answer: str
+
+    sources: List[Source]
