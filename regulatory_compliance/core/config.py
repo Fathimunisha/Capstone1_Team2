@@ -1,11 +1,11 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
- 
- 
+
+
 class Settings(BaseSettings):
     """
     Application configuration loaded from .env
     """
- 
+
     APP_NAME: str
     APP_VERSION: str
     HOST: str
@@ -13,9 +13,10 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str
     # PG_CONNECTION_STRING: str
     UPLOAD_FOLDER: str
-    LOG_LEVEL: str
+    LOG_LEVEL: str 
     TOP_K_RESULTS: int
     MODEL_NAME: str
+    OPENAI_MODEL:str = "gpt-5.5"
     EMBEDDING_MODEL: str
     EMBEDDING_DIMENSION: int
     CHUNK_SIZE: int = 512
@@ -26,7 +27,7 @@ class Settings(BaseSettings):
     DATABASE_USER: str
     DATABASE_PASSWORD: str
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
- 
+
     @property
     def DATABASE_URL(self) -> str:
         return (
@@ -36,6 +37,6 @@ class Settings(BaseSettings):
             f"host={self.DATABASE_HOST} "
             f"port={self.DATABASE_PORT}"
         )
- 
- 
+
+
 settings = Settings()

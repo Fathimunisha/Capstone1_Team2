@@ -15,48 +15,50 @@ from regulatory_compliance.utils.exceptions import (
     DatabaseException,
     LLMException,
 )
- 
- 
+
+
 @asynccontextmanager
-async def lifespan(app):
- 
-    Database.connect()
+async def lifespan(app: FastAPI):
+
+    print("Application startup completed")
+
     yield
-    Database.close()
- 
- 
+
+    print("Application shutdown completed")
+
+
 app = FastAPI(title=settings.APP_NAME, version=settings.APP_VERSION, lifespan=lifespan)
 app.include_router(upload_router)
 app.include_router(query_router)
- 
- 
+
+
 @app.exception_handler(InvalidFileException)
 async def invalid_file_handler(request: Request, exc: InvalidFileException):
- 
+
     return JSONResponse(
         status_code=400, content={"success": False, "message": exc.message}
     )
- 
- 
+
+
 @app.exception_handler(DocumentNotFoundException)
 async def document_not_found_handler(request: Request, exc: DocumentNotFoundException):
- 
+
     return JSONResponse(
         status_code=404, content={"success": False, "message": exc.message}
     )
- 
- 
+
+
 @app.exception_handler(DatabaseException)
 async def database_handler(request: Request, exc: DatabaseException):
- 
+
     return JSONResponse(
         status_code=500, content={"success": False, "message": exc.message}
     )
- 
- 
+
+
 @app.exception_handler(LLMException)
 async def llm_handler(request: Request, exc: LLMException):
- 
+
     return JSONResponse(
         status_code=500, content={"success": False, "message": exc.message}
     )
