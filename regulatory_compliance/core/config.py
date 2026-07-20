@@ -11,12 +11,11 @@ class Settings(BaseSettings):
     HOST: str
     PORT: int
     OPENAI_API_KEY: str
-    # PG_CONNECTION_STRING: str
     UPLOAD_FOLDER: str
-    LOG_LEVEL: str 
+    LOG_LEVEL: str
     TOP_K_RESULTS: int
     MODEL_NAME: str
-    OPENAI_MODEL:str = "gpt-5.5"
+    OPENAI_MODEL: str = "gpt-5.5"
     EMBEDDING_MODEL: str
     EMBEDDING_DIMENSION: int
     CHUNK_SIZE: int = 512
