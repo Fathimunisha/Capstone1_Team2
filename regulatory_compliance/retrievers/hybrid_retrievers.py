@@ -15,7 +15,7 @@ class HybridRetriever:
     Reciprocal Rank Fusion (RRF)
     """
 
-    def __init__(self, top_k: int = 8, rrf_constant: int = 60):
+    def __init__(self, top_k: int = 5, rrf_constant: int = 60):
 
         self.top_k = top_k
 
@@ -90,9 +90,7 @@ class HybridRetriever:
             doc.metadata["retrieval_method"] = "hybrid_search"
 
             doc.metadata.update(
-                {
-                    # "hybrid_score": round(score, 6),
-                    # "retrieval_method": "hybrid_search",
+                {                   
                     "retrieval_details": {
                         "vector_score": doc.metadata.get("vector_score"),
                         "fts_score": doc.metadata.get("fts_score"),

@@ -13,7 +13,7 @@ class FTSRetriever:
     - ts_rank_cd
     """
 
-    def __init__(self, top_k: int = 8):
+    def __init__(self, top_k: int = 5):
 
         self.top_k = top_k
 

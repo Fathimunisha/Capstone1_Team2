@@ -26,7 +26,7 @@ class UploadRequest(BaseModel):
         min_length=3,
         max_length=100,
         description="Name of the uploaded PDF document",
-        examples=["RBI_Guidelines.pdf"],
+        examples=["Capstone_Project_1_Regulatory_Compliance_System_FAQ.pdf"],
     )
 
 
