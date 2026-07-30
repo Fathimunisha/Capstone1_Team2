@@ -330,18 +330,15 @@ Generate the final answer using only the retrieved regulatory context.
 
             return {
                 "answer": (
-                    "Hello! I am your Regulatory Compliance AI assistant. "
+                    "Hello! I am your Regulatory Compliance RAG assistant. "
                     "Please ask questions related to the uploaded "
                     "regulatory documents."
                 ),
                 "query_type": "chitchat",
                 "tool_used": None,
                 "sources": [],
-                "latency_ms": round(
-                    (time.time() - start_time) * 1000,
-                    2,
-                ),
-                "confidence": 1.0,
+                "latency_ms": None,
+                "confidence": None
             }
 
         # ------------------------------------------
@@ -352,18 +349,15 @@ Generate the final answer using only the retrieved regulatory context.
 
             return {
                 "answer": (
-                    "I am a Regulatory Compliance AI assistant focused "
+                    "I am a Regulatory Compliance RAG assistant focused "
                     "on RBI, SEBI, Basel, and internal regulatory documents. "
                     "I cannot answer unrelated general questions."
                 ),
                 "query_type": "out_of_scope",
                 "tool_used": None,
                 "sources": [],
-                "latency_ms": round(
-                    (time.time() - start_time) * 1000,
-                    2,
-                ),
-                "confidence": 1.0,
+                "latency_ms": None,
+                "confidence": None
             }
 
         # ------------------------------------------

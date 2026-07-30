@@ -191,22 +191,32 @@ if question:
 
                 st.divider()
 
+                # ----------------------------------
                 # Metadata
+                # Show only for RAG / Regulatory queries
+                # ----------------------------------
 
-                col1, col2, col3 = st.columns(3)
+                if result.get("query_type") == "rag" and result.get("tool_used"):
 
-                with col1:
+                    col1, col2, col3 = st.columns(3)
 
-                    st.metric("Tool Used", result.get("tool_used", "N/A"))
+                    with col1:
+                        st.metric(
+                            "Tool Used",
+                            result.get("tool_used")
+                        )
 
-                with col2:
+                    with col2:
+                        st.metric(
+                            "Confidence",
+                            result.get("confidence")
+                        )
 
-                    st.metric("Confidence", result.get("confidence", 0))
-
-                with col3:
-
-                    st.metric("Latency", f"{latency} ms")
-
+                    with col3:
+                        st.metric(
+                            "Latency",
+                            f"{latency} ms"
+                        )
                 # ----------------------------------
                 # Citations
                 # ----------------------------------
