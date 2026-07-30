@@ -97,8 +97,6 @@ class VectorRetriever:
 
                 vector_score = float(row[4])
 
-                # Merge metadata safely
-
                 metadata = {
                     **stored_metadata,
                     "document_id": str(document_id),
