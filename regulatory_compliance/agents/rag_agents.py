@@ -105,7 +105,7 @@ User Question:
 
         response = self.client.chat.completions.create(
             model=settings.OPENAI_MODEL,
-            max_completion_tokens=200,
+            max_completion_tokens=2000,
             messages=[
                 {
                     "role": "system",
