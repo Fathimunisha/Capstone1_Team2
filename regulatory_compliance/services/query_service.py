@@ -1,6 +1,5 @@
 from regulatory_compliance.models.request import AskRequest
 from regulatory_compliance.models.response import ApiResponse
-from regulatory_compliance.retrievers.hybrid_retrievers import HybridRetriever
 from regulatory_compliance.agents.rag_agents import RAGAgent
 
 
@@ -9,10 +8,16 @@ class QueryService:
     Handles user query operations.
     """
 
+    def __init__(self):
+        self.agent = RAGAgent()
+
     @staticmethod
     async def ask_question(request: AskRequest) -> ApiResponse:
         """
         Process user question.
+
+        This method is kept for backward compatibility with the
+        older /ask endpoint.
         """
 
         return ApiResponse(
@@ -24,38 +29,27 @@ class QueryService:
             },
         )
 
-    def __init__(self):
-
-        self.retriever = HybridRetriever(top_k=5)
-
-        self.agent = RAGAgent()
-
     def process_query(self, question: str):
+        """
+        Process a user query through the RAG Agent.
+
+        The RAGAgent is responsible for:
+        - Classifying the query as CHITCHAT, REGULATORY, or OUT_OF_SCOPE
+        - Deciding whether document retrieval is required
+        - Selecting the retrieval tool
+        - Retrieving documents for regulatory questions
+        - Generating the final answer
+        """
+
         print("1. Query received:", question)
-        return self.agent.run(question, [])
 
-        documents = self.retriever.search(question)
-        print("2. Retrieval completed. Documents:", len(documents))
+        result = self.agent.run(
+            question,
+            [],
+        )
 
-        answer = self.agent.generate_answer(question, documents)
-        print("3. LLM response generated")
-        sources = []
+        print("2. Query processing completed")
+        print("Query type:", result.get("query_type"))
+        print("Tool used:", result.get("tool_used"))
 
-        for doc in documents:
-
-            document_id = doc.metadata.get("document_id")
-
-            sources.append(
-                {
-                    "document_id": str(document_id) if document_id else None,
-                    "chunk_index": int(doc.metadata.get("chunk_index", 0)),
-                    "hybrid_score": float(doc.metadata.get("hybrid_score", 0.0)),
-                }
-            )
-        print("4. Response prepared")
-        response = {"answer": answer, "sources": sources}
-
-        print("FINAL RESPONSE:")
-        print(response)
-
-        return response
+        return result
