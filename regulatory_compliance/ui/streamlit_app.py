@@ -1,73 +1,3 @@
-# import streamlit as st
-# from api_client import upload_pdf, ask_question
-
-# st.set_page_config(page_title="Regulatory Compliance", layout="wide")
-
-
-# st.title("Regulatory Compliance Assistant")
-
-
-# st.write("""
-#     Upload regulatory documents and ask compliance related questions.
-#     """)
-
-
-# # ---------------------------
-# # PDF Upload Section
-# # ---------------------------
-
-# st.sidebar.header("Upload Document")
-
-
-# uploaded_file = st.sidebar.file_uploader("Upload PDF", type=["pdf"])
-
-
-# if uploaded_file:
-
-#     if st.sidebar.button("Upload"):
-
-#         with st.spinner("Processing document..."):
-
-#             result = upload_pdf(uploaded_file)
-
-#         st.sidebar.success("Document uploaded successfully")
-
-#         st.sidebar.json(result)
-
-
-# # ---------------------------
-# # Query Section
-# # ---------------------------
-
-
-# st.header("Ask Compliance Question")
-
-
-# question = st.text_input("Enter your question")
-
-
-# if st.button("Submit"):
-
-#     if question:
-
-#         with st.spinner("Searching regulations..."):
-
-#             response = ask_question(question)
-
-#         st.subheader("Answer")
-
-#         st.write(response["answer"])
-
-#         st.subheader("Sources")
-
-#         for source in response["sources"]:
-
-#             st.json(source)
-
-#     else:
-
-#         st.warning("Please enter a question")
-
 import streamlit as st
 import requests
 import time
@@ -175,7 +105,7 @@ if question:
 
             start = time.time()
 
-            payload = {"question": question}
+            payload = {"question": question, "chat_history": st.session_state.messages}
 
             response = requests.post(QUERY_ENDPOINT, json=payload)
 
@@ -189,6 +119,10 @@ if question:
 
                 st.write(answer)
 
+                st.session_state.messages.append(
+                    {"role": "assistant", "content": answer}
+                )
+
                 st.divider()
 
                 # ----------------------------------
@@ -201,22 +135,13 @@ if question:
                     col1, col2, col3 = st.columns(3)
 
                     with col1:
-                        st.metric(
-                            "Tool Used",
-                            result.get("tool_used")
-                        )
+                        st.metric("Tool Used", result.get("tool_used"))
 
                     with col2:
-                        st.metric(
-                            "Confidence",
-                            result.get("confidence")
-                        )
+                        st.metric("Confidence", result.get("confidence"))
 
                     with col3:
-                        st.metric(
-                            "Latency",
-                            f"{latency} ms"
-                        )
+                        st.metric("Latency", f"{latency} ms")
                 # ----------------------------------
                 # Citations
                 # ----------------------------------

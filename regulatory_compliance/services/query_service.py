@@ -45,7 +45,7 @@ class QueryService:
 
         result = self.agent.run(
             question,
-            [],
+            # [],
         )
 
         print("2. Query processing completed")
