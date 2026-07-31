@@ -1,47 +1,47 @@
 import time
 import json
-from typing import List, Dict, Optional
-from openai import OpenAI
 from langsmith import traceable
-from langchain_core.documents import Document
-from regulatory_compliance.core.config import settings
-from regulatory_compliance.retrievers.vector_retrievers import VectorRetriever
-from regulatory_compliance.retrievers.fts_retrievers import FTSRetriever
-from regulatory_compliance.retrievers.hybrid_retrievers import HybridRetriever
+
+from regulatory_compliance.services.llm_service import LLMService
+
+from regulatory_compliance.tools.rag_tools import (
+    vector_search_tool,
+    fts_search_tool,
+    hybrid_search_tool,
+)
+
+from langchain.agents import create_agent
 
 
 class RAGAgent:
-    """
-    Regulatory Compliance RAG Agent.
-
-    Responsibilities:
-    - Classify user intent
-    - Select retrieval strategy
-    - Retrieve relevant documents
-    - Generate answer using system/user prompts
-    - Preserve citation metadata
-    """
 
     def __init__(self):
 
-        self.client = OpenAI(api_key=settings.OPENAI_API_KEY)
+        self.llm = LLMService().get_llm()
 
-        self.vector_retriever = VectorRetriever(top_k=5)
+        self.agent = create_agent(
+            model=self.llm,
+            tools=[vector_search_tool, fts_search_tool, hybrid_search_tool],
+            system_prompt="""
 
-        self.fts_retriever = FTSRetriever(top_k=5)
+You are a Regulatory Compliance AI Assistant.
 
-        self.hybrid_retriever = HybridRetriever(top_k=5)
 
-    # ==========================================================
-    # STEP 1: INTENT + TOOL SELECTION
-    # ==========================================================
+Your responsibility:
 
-    def classify_query(self, question: str) -> Dict:
+Answer questions related to:
 
-        system_prompt = """
-You are an intent classifier for a Regulatory Compliance RAG Assistant.
-
-The assistant is designed ONLY for questions related to:
+- RBI regulations
+- SEBI regulations
+- Basel regulations
+- Banking compliance
+- Gold loan regulations
+- AML
+- KYC
+- Uploaded regulatory documents
+- Loans
+- Gold Loans
+- Fund regulations
 - RBI regulations
 - SEBI regulations
 - Basel regulations
@@ -56,185 +56,96 @@ The assistant is designed ONLY for questions related to:
 - Compliance policies
 - Uploaded regulatory documents
 
-Classify the user's question into exactly one category:
 
-1. CHITCHAT
-   Casual conversation such as:
-   - Hi
-   - Hello
-   - How are you?
-   - Thank you
-   - Who are you?
 
-2. REGULATORY
-   Questions related to regulatory compliance or uploaded
-   regulatory documents.
+Tool usage rules:
 
-3. OUT_OF_SCOPE
-   General questions unrelated to regulatory compliance.
+Tool Selection Rules:
 
-If the category is REGULATORY, select exactly one retrieval tool:
+You must select exactly ONE retrieval tool for regulatory questions.
 
-- fts_search
-  Use for exact text, clause, section, ID, or keyword lookup.
+Decision logic:
 
-- vector_search
-  Use for conceptual questions, explanation, meaning, or semantic understanding.
+1. Use fts_search_tool ONLY when the user is asking for exact information.
 
-- hybrid_search
-  Use when both semantic and keyword retrieval are useful.
+Examples:
+- "What is section 4.2?"
+- "Find clause 8"
+- "Show paragraph related to KYC"
+- "Search keyword collateral"
+- "Give exact wording"
 
-Return ONLY valid JSON.
+Reason:
+The user needs exact text matching.
 
-Required JSON format:
+-------------------------------------------------
 
-{
-    "query_type": "CHITCHAT | REGULATORY | OUT_OF_SCOPE",
-    "tool_name": "fts_search | vector_search | hybrid_search | none"
-}
+2. Use vector_search_tool ONLY when the user wants conceptual understanding.
 
-Do not include markdown.
-Do not include explanations.
-"""
+Examples:
+- "Explain enhanced due diligence"
+- "What does LTV mean?"
+- "Why is KYC required?"
+- "Explain gold loan default process"
 
-        user_prompt = f"""
-User Question:
+Reason:
+The user needs semantic interpretation.
 
-{question}
-"""
+-------------------------------------------------
 
-        response = self.client.chat.completions.create(
-            model=settings.OPENAI_MODEL,
-            max_completion_tokens=2000,
-            messages=[
-                {
-                    "role": "system",
-                    "content": system_prompt,
-                },
-                {
-                    "role": "user",
-                    "content": user_prompt,
-                },
-            ],
-        )
+3. Use hybrid_search_tool for all other regulatory questions.
 
-        content = response.choices[0].message.content.strip()
+Examples:
+- "What are auction norms for gold loans?"
+- "What are RBI requirements for KYC?"
+- "Tell me lending guidelines"
 
-        try:
+Reason:
+The user needs both keyword and semantic retrieval.
 
-            result = json.loads(content)
+-------------------------------------------------
 
-        except json.JSONDecodeError:
+Do NOT always use hybrid_search_tool.
+Choose based on the above rules.
 
-            # Safe fallback
+4. For general questions:
 
-            result = {
-                "query_type": "REGULATORY",
-                "tool_name": "hybrid_search",
-            }
+Examples:
+- Who is prime minister?
+- Where is Mumbai?
+- Places to visit
 
-        return result
+Do NOT call any tool.
 
-    # ==========================================================
-    # STEP 2: RETRIEVAL
-    # ==========================================================
+Reply:
 
-    def retrieve_documents(
-        self,
-        question: str,
-        tool_name: str,
-    ) -> List[Document]:
+"I am a Regulatory Compliance assistant and can only answer questions related to regulatory documents."
 
-        if tool_name == "vector_search":
 
-            return self.vector_retriever.search(question)
+# 5. For greetings and casual conversation:
 
-        elif tool_name == "fts_search":
+#     Examples:
+#     - hello
+#     - hi
+#     - good morning
+#     - thank you
+#     - how are you
+    
 
-            return self.fts_retriever.search(question)
+#     DO NOT call any retrieval tool.
+#     DO NOT search documents.
 
-        else:
+# 6. For normal chit chat discussions:
 
-            return self.hybrid_retriever.search(question)
+#     DO NOT call any retrieval tool.
+#     DO NOT search documents.
 
-    # ==========================================================
-    # STEP 3: BUILD CONTEXT
-    # ==========================================================
+# 7. For questions unrelated to regulatory compliance:
 
-    def build_context(
-        self,
-        documents: List[Document],
-    ) -> str:
+#     Answer directly using your own knowledge.
 
-        context = ""
-
-        for index, doc in enumerate(
-            documents,
-            start=1,
-        ):
-
-            metadata = doc.metadata
-
-            context += f"""
-
---- RETRIEVED DOCUMENT {index} ---
-
-Document ID:
-{metadata.get("document_id")}
-
-File Name:
-{metadata.get("file_name")}
-
-Page Number:
-{metadata.get("page_number")}
-
-Section Number:
-{metadata.get("section_number")}
-
-Regulation Type:
-{metadata.get("regulation_type")}
-
-Chunk Index:
-{metadata.get("chunk_index")}
-
-Retrieval Method:
-{metadata.get("retrieval_method")}
-
-Vector Score:
-{metadata.get("vector_score")}
-
-FTS Score:
-{metadata.get("fts_score")}
-
-Hybrid Score:
-{metadata.get("hybrid_score")}
-
-Content:
-{doc.page_content}
-
-"""
-
-        return context
-
-    # ==========================================================
-    # STEP 4: GENERATE ANSWER
-    # ==========================================================
-
-    def generate_answer(
-        self,
-        question: str,
-        documents: List[Document],
-    ) -> str:
-
-        context = self.build_context(documents)
-
-        system_prompt = """
-You are a Regulatory Compliance Assistant.
-
-Your role is to answer questions using ONLY the retrieved
-regulatory documents provided in the user message.
-
-Rules:
+#     DO NOT call any retrieval tool.
+#     DO NOT search documents.
 
 1. Use only the retrieved context.
 2. Do not hallucinate or invent regulatory requirements.
@@ -253,186 +164,93 @@ Rules:
 10. If the retrieved context contains conflicting information,
     clearly mention the conflict.
 11. Do not answer unrelated general knowledge questions.
+    
+8. Never create regulatory information.
 
-Temperature:
-0
-"""
+9. If context does not contain answer:
 
-        user_prompt = f"""
-User Question:
+Say:
 
-{question}
-
-
-Retrieved Regulatory Context:
-
-{context}
+"Information is not available in the provided documents."
 
 
-Generate the final answer using only the retrieved regulatory context.
-"""
+Keep answers concise.
 
-        response = self.client.chat.completions.create(
-            model=settings.OPENAI_MODEL,
-            max_completion_tokens=2000,
-            messages=[
-                {
-                    "role": "system",
-                    "content": system_prompt,
-                },
-                {
-                    "role": "user",
-                    "content": user_prompt,
-                },
-            ],
+""",
         )
 
-        return response.choices[0].message.content
+    def build_context(self, documents):
+        """
+        Build retrieved context for LangSmith evaluation.
+        """
 
-    # ==========================================================
-    # STEP 5: MAIN RAG PIPELINE
-    # ==========================================================
+        context = ""
 
-    @traceable(name="rag_agent")
-    def run(
-        self,
-        question: str,
-        chat_history: Optional[List[Dict]] = None,
-    ):
-
-        start_time = time.time()
-
-        if chat_history is None:
-
-            chat_history = []
-
-        # ------------------------------------------
-        # Query Classification
-        # ------------------------------------------
-
-        classification = self.classify_query(question)
-
-        query_type = classification.get(
-            "query_type",
-            "REGULATORY",
-        )
-
-        tool_name = classification.get(
-            "tool_name",
-            "hybrid_search",
-        )
-
-        # ------------------------------------------
-        # Chitchat
-        # ------------------------------------------
-
-        if query_type == "CHITCHAT":
-
-            return {
-                "answer": (
-                    "Hello! I am your Regulatory Compliance RAG assistant. "
-                    "Please ask questions related to the uploaded "
-                    "regulatory documents."
-                ),
-                "query_type": "chitchat",
-                "tool_used": None,
-                "sources": [],
-                "latency_ms": None,
-                "confidence": None
-            }
-
-        # ------------------------------------------
-        # Out of Scope
-        # ------------------------------------------
-
-        if query_type == "OUT_OF_SCOPE":
-
-            return {
-                "answer": (
-                    "I am a Regulatory Compliance RAG assistant focused "
-                    "on RBI, SEBI, Basel, and internal regulatory documents. "
-                    "I cannot answer unrelated general questions."
-                ),
-                "query_type": "out_of_scope",
-                "tool_used": None,
-                "sources": [],
-                "latency_ms": None,
-                "confidence": None
-            }
-
-        # ------------------------------------------
-        # Regulatory Retrieval
-        # ------------------------------------------
-
-        documents = self.retrieve_documents(
-            question,
-            tool_name,
-        )
-
-        # ------------------------------------------
-        # No Documents
-        # ------------------------------------------
-
-        if not documents:
-
-            return {
-                "answer": (
-                    "I could not find relevant information "
-                    "in the uploaded documents."
-                ),
-                "query_type": "rag",
-                "tool_used": tool_name,
-                "sources": [],
-                "latency_ms": round(
-                    (time.time() - start_time) * 1000,
-                    2,
-                ),
-                "confidence": 0.2,
-            }
-
-        # ------------------------------------------
-        # Generate Answer
-        # ------------------------------------------
-
-        answer = self.generate_answer(
-            question,
-            documents,
-        )
-
-        # ------------------------------------------
-        # Citation Metadata
-        # ------------------------------------------
-
-        sources = []
-
-        for doc in documents:
+        for index, doc in enumerate(documents, start=1):
 
             metadata = doc.metadata
 
-            sources.append(
-                {
-                    "document_id": metadata.get("document_id"),
-                    "file_name": metadata.get("file_name"),
-                    "page_number": metadata.get("page_number"),
-                    "section_number": metadata.get("section_number"),
-                    "regulation_type": metadata.get("regulation_type"),
-                    "chunk_index": metadata.get("chunk_index"),
-                    "retrieval_method": metadata.get("retrieval_method"),
-                    "vector_score": metadata.get("vector_score"),
-                    "fts_score": metadata.get("fts_score"),
-                    "hybrid_score": metadata.get("hybrid_score"),
-                    "snippet": doc.page_content[:300],
-                }
-            )
+            context += f"""
 
-        # ------------------------------------------
-        # Final Response
-        # ------------------------------------------
+    --- Document {index} ---
+
+    Document ID:
+    {metadata.get("document_id")}
+
+    File Name:
+    {metadata.get("file_name")}
+
+    Page Number:
+    {metadata.get("page_number")}
+
+    Section:
+    {metadata.get("section_number")}
+
+    Regulation Type:
+    {metadata.get("regulation_type")}
+
+    Content:
+
+    {doc.page_content}
+
+    """
+
+        return context
+
+    @traceable(name="rag_agent")
+    def run(self, question: str):
+
+        start_time = time.time()
+
+        response = self.agent.invoke(
+            {
+                "messages": [
+                    {"role": "user", "content": question},
+                ]
+            }
+        )
+
+        tool_used = None
+        sources = []
+        context = ""
+
+        for message in response["messages"]:
+            if message.type == "tool":
+                tool_response = json.loads(message.content)
+
+                tool_used = tool_response.get("tool_used")
+                sources = tool_response.get("sources", [])
+
+        answer = response["messages"][-1].content
 
         return {
             "answer": answer,
+            # For evaluation
+            "inputs": {"question": question},
+            "outputs": {"answer": answer},
+            "context": context,
             "query_type": "rag",
-            "tool_used": tool_name,
+            "tool_used": tool_used,
             "sources": sources,
             "latency_ms": round(
                 (time.time() - start_time) * 1000,
