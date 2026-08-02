@@ -1,15 +1,13 @@
+from langchain_core.messages import HumanMessage, AIMessage
 import time
 import json
 from langsmith import traceable
-
 from regulatory_compliance.services.llm_service import LLMService
-
 from regulatory_compliance.tools.rag_tools import (
     vector_search_tool,
     fts_search_tool,
     hybrid_search_tool,
 )
-
 from langchain.agents import create_agent
 
 
@@ -23,156 +21,93 @@ class RAGAgent:
             model=self.llm,
             tools=[vector_search_tool, fts_search_tool, hybrid_search_tool],
             system_prompt="""
+            You are a Regulatory Compliance AI Assistant.
+        
+You have two modes:
 
-You are a Regulatory Compliance AI Assistant.
+MODE 1: Conversation
 
+For:
+- greetings
+- user introduction
+- remembering user's name
+- thanks
+- casual conversation
 
-Your responsibility:
+Do not call any tool.
 
-Answer questions related to:
+Use previous conversation history.
 
-- RBI regulations
-- SEBI regulations
-- Basel regulations
-- Banking compliance
-- Gold loan regulations
+---------------------------------
+
+MODE 2: Regulatory Document Question
+
+For questions related to:
+
+- RBI
+- SEBI
+- Basel
 - AML
 - KYC
-- Uploaded regulatory documents
-- Loans
-- Gold Loans
-- Fund regulations
-- RBI regulations
-- SEBI regulations
-- Basel regulations
+- Gold Loan
 - Banking compliance
-- Gold loan regulations
 - Lending regulations
-- KYC
-- AML
-- Financial regulations
-- Regulatory guidelines
-- Regulatory circulars
-- Compliance policies
-- Uploaded regulatory documents
+- Uploaded documents
+
+You MUST call exactly ONE tool.
+
+Tool selection:
+
+fts_search_tool:
+Use when query contains:
+- exact section
+- clause
+- paragraph
+- keyword lookup
+- specific phrase
 
 
+vector_search_tool:
+Use when user asks:
+- explain
+- meaning
+- interpretation
+- concept
 
-Tool usage rules:
+hybrid_search_tool:
+Use for all other regulatory questions.
 
-Tool Selection Rules:
+After retrieving documents:
 
-You must select exactly ONE retrieval tool for regulatory questions.
-
-Decision logic:
-
-1. Use fts_search_tool ONLY when the user is asking for exact information.
-
-Examples:
-- "What is section 4.2?"
-- "Find clause 8"
-- "Show paragraph related to KYC"
-- "Search keyword collateral"
-- "Give exact wording"
-
-Reason:
-The user needs exact text matching.
-
--------------------------------------------------
-
-2. Use vector_search_tool ONLY when the user wants conceptual understanding.
-
-Examples:
-- "Explain enhanced due diligence"
-- "What does LTV mean?"
-- "Why is KYC required?"
-- "Explain gold loan default process"
-
-Reason:
-The user needs semantic interpretation.
-
--------------------------------------------------
-
-3. Use hybrid_search_tool for all other regulatory questions.
-
-Examples:
-- "What are auction norms for gold loans?"
-- "What are RBI requirements for KYC?"
-- "Tell me lending guidelines"
-
-Reason:
-The user needs both keyword and semantic retrieval.
-
--------------------------------------------------
-
-Do NOT always use hybrid_search_tool.
-Choose based on the above rules.
-
-4. For general questions:
-
-Examples:
-- Who is prime minister?
-- Where is Mumbai?
-- Places to visit
-
-Do NOT call any tool.
-
-Reply:
-
-"I am a Regulatory Compliance assistant and can only answer questions related to regulatory documents."
-
-
-# 5. For greetings and casual conversation:
-
-#     Examples:
-#     - hello
-#     - hi
-#     - good morning
-#     - thank you
-#     - how are you
-    
-
-#     DO NOT call any retrieval tool.
-#     DO NOT search documents.
-
-# 6. For normal chit chat discussions:
-
-#     DO NOT call any retrieval tool.
-#     DO NOT search documents.
-
-# 7. For questions unrelated to regulatory compliance:
-
-#     Answer directly using your own knowledge.
-
-#     DO NOT call any retrieval tool.
-#     DO NOT search documents.
-
-1. Use only the retrieved context.
-2. Do not hallucinate or invent regulatory requirements.
-3. Do not use external knowledge.
-4. If the answer cannot be found in the retrieved documents,
-   say:
-
-   "Information is not available in the provided documents."
-
-5. Provide a concise and professional compliance-focused answer.
-6. If multiple retrieved documents contain relevant information,
-   combine them carefully.
-7. Do not create a Sources section.
-8. Do not invent page numbers, sections, document names, or citations.
-9. Citation metadata is handled separately by the application.
-10. If the retrieved context contains conflicting information,
-    clearly mention the conflict.
-11. Do not answer unrelated general knowledge questions.
-    
-8. Never create regulatory information.
-
-9. If context does not contain answer:
-
-Say:
+- Answer only from retrieved documents.
+- Never use previous answers as regulatory source.
+- Never hallucinate.
+- If information missing:
 
 "Information is not available in the provided documents."
 
+---------------------------------
+
+IMPORTANT CURRENT QUERY RULE:
+
+The latest user message always has highest priority.
+
+Do not classify the current question based on previous conversation.
+
+Use chat history only for:
+- user identity
+- greetings
+- casual references like "what did I say?"
+
+MODE 3: General knowledge
+
+Do not call tools.
+
+Reply:
+
+"I am a Regulatory Compliance assistant and can help only with regulatory documents and compliance related questions."
+
+---------------------------------
 
 Keep answers concise.
 
@@ -218,43 +153,62 @@ Keep answers concise.
         return context
 
     @traceable(name="rag_agent")
-    def run(self, question: str):
+    def run(self, question: str, chat_history=None):
 
         start_time = time.time()
 
-        response = self.agent.invoke(
-            {
-                "messages": [
-                    {"role": "user", "content": question},
-                ]
-            }
-        )
+        messages = []
+
+        if chat_history:
+
+            for msg in chat_history:
+
+                if msg["role"] == "user":
+                    messages.append(HumanMessage(content=msg["content"]))
+
+                elif msg["role"] == "assistant":
+
+                    messages.append(AIMessage(content=msg["content"]))
+
+        # avoid duplicate current question
+        if not messages or messages[-1].content != question:
+
+            messages.append(HumanMessage(content=question))
+
+        response = self.agent.invoke({"messages": messages})
 
         tool_used = None
         sources = []
         context = ""
 
         for message in response["messages"]:
-            if message.type == "tool":
-                tool_response = json.loads(message.content)
 
-                tool_used = tool_response.get("tool_used")
-                sources = tool_response.get("sources", [])
+            if message.type == "tool":
+
+                try:
+
+                    tool_response = json.loads(message.content)
+
+                    tool_used = tool_response.get("tool_used")
+
+                    sources = tool_response.get("sources", [])
+
+                    context += tool_response.get("context", "")
+
+                except Exception:
+
+                    context += str(message.content)
 
         answer = response["messages"][-1].content
 
         return {
             "answer": answer,
-            # For evaluation
             "inputs": {"question": question},
             "outputs": {"answer": answer},
             "context": context,
-            "query_type": "rag",
+            "query_type": ("rag" if tool_used else "conversation"),
             "tool_used": tool_used,
             "sources": sources,
-            "latency_ms": round(
-                (time.time() - start_time) * 1000,
-                2,
-            ),
+            "latency_ms": round((time.time() - start_time) * 1000, 2),
             "confidence": 0.85,
         }

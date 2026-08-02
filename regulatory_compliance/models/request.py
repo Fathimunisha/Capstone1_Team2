@@ -1,3 +1,4 @@
+from typing import List, Dict
 from pydantic import BaseModel, Field
 
 
@@ -33,3 +34,4 @@ class UploadRequest(BaseModel):
 class QueryRequest(BaseModel):
 
     question: str
+    chat_history: List[Dict] = []
