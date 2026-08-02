@@ -29,22 +29,23 @@ class QueryService:
             },
         )
 
-    def process_query(self, question: str):
+    def process_query(self, question: str, chat_history: None):
         """
         Process a user query through the RAG Agent.
 
         The RAGAgent is responsible for:
-        - Classifying the query as CHITCHAT, REGULATORY, or OUT_OF_SCOPE
-        - Deciding whether document retrieval is required
+        # - Classifying the query as CHITCHAT, REGULATORY, or OUT_OF_SCOPE
+        # - Deciding whether document retrieval is required
         - Selecting the retrieval tool
         - Retrieving documents for regulatory questions
         - Generating the final answer
         """
 
-        print("1. Query received:", question)
+        print("1. Query received:", question, chat_history)
 
         result = self.agent.run(
             question,
+            chat_history,
             # [],
         )
 

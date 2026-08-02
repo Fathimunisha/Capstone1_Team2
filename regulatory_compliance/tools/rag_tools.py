@@ -64,16 +64,17 @@ Content:
 @tool
 def vector_search_tool(query: str):
     """
-    Use this tool for semantic understanding.
+     Use this tool for semantic understanding.
 
-    Use when user asks:
-    - explain
-    - meaning
-    - interpretation
-    - purpose
-    - conceptual questions
+     Use when user asks:
+     - explain
+     - meaning
+     - interpretation
+     - why
+     - how does regulation work
+     - provide understanding of compliance concept
 
-    Performs vector similarity search.
+    This tool performs semantic similarity search.
     """
 
     docs = vector_retriever.search(query)
@@ -95,13 +96,14 @@ def fts_search_tool(query: str):
     Use this tool for exact document lookup.
 
     Use when user asks for:
-    - section numbers
-    - clauses
-    - paragraphs
+    - exact clause
+    - section number
+    - paragraph
+    - circular number
+    - specific keyword
     - exact wording
-    - keyword search
 
-    Performs full text search.
+    This tool performs keyword based search.
     """
 
     docs = fts_retriever.search(query)
@@ -127,10 +129,11 @@ def hybrid_search_tool(query: str):
     - semantic vector search
 
     Use when user asks about:
-    - regulations
-    - guidelines
-    - compliance requirements
-    - policies
+    - general compliance questions
+    - regulatory guidance
+    - uploaded document questions
+
+    This combines vector similarity and keyword search
     """
 
     docs = hybrid_retriever.search(query)
