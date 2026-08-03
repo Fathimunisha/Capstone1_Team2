@@ -11,7 +11,6 @@ class EmbeddingService:
     """
 
     def __init__(self):
-
         self.client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
     def _validate_dimension(
@@ -24,11 +23,8 @@ class EmbeddingService:
         """
 
         actual_dimension = len(embedding)
-
         expected_dimension = settings.EMBEDDING_DIMENSION
-
         if actual_dimension != expected_dimension:
-
             raise ValueError(
                 f"Embedding dimension mismatch. "
                 f"Expected: {expected_dimension}, "
@@ -48,12 +44,9 @@ class EmbeddingService:
             model=settings.EMBEDDING_MODEL,
             input=text,
         )
-
         embedding = response.data[0].embedding
-
         # Dimension validation
         self._validate_dimension(embedding)
-
         return embedding
 
         logger.info(
@@ -70,17 +63,14 @@ class EmbeddingService:
         Generate embeddings for multiple texts.
         Used during PDF ingestion.
         """
-
         response = self.client.embeddings.create(
             model=settings.EMBEDDING_MODEL,
             input=texts,
         )
-
         embeddings = [item.embedding for item in response.data]
 
         # Validate every generated embedding
         for embedding in embeddings:
-
             self._validate_dimension(embedding)
 
         return embeddings

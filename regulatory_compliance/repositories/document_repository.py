@@ -25,7 +25,6 @@ class DocumentRepository:
         total_chunks: int,
     ) -> str:
         document_id = str(uuid.uuid4())
-
         sql = """
         INSERT INTO documents
         (
@@ -37,7 +36,6 @@ class DocumentRepository:
             total_pages,
             total_chunks
         )
-
         VALUES
         (
             %s,%s,%s,%s,%s,%s,%s
@@ -45,11 +43,8 @@ class DocumentRepository:
         """
 
         try:
-
             with Database.get_connection() as conn:
-
                 with conn.cursor() as cur:
-
                     cur.execute(
                         sql,
                         (
@@ -62,17 +57,12 @@ class DocumentRepository:
                             total_chunks,
                         ),
                     )
-
                 conn.commit()
-
             logger.info("Document inserted successfully.")
-
             return document_id
 
         except Exception as ex:
-
             logger.exception("Failed to insert document.")
-
             raise ex
 
     def insert_chunks_with_embeddings(
@@ -94,7 +84,6 @@ class DocumentRepository:
             tsv,
             metadata
         )
-
         VALUES
         (
             %s,%s,%s,%s,%s,%s,%s,to_tsvector('english', %s),%s
@@ -102,21 +91,13 @@ class DocumentRepository:
         """
 
         try:
-
             with Database.get_connection() as conn:
-
                 with conn.cursor() as cur:
-
                     for index, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
-
                         chunk_id = str(uuid.uuid4())
-
                         metadata = json.dumps(chunk.metadata)
-
                         page_number = chunk.metadata.get("page", 0)
-
                         section_number = chunk.metadata.get("section", None)
-
                         cur.execute(
                             sql,
                             (
@@ -131,7 +112,6 @@ class DocumentRepository:
                                 metadata,
                             ),
                         )
-
                 conn.commit()
 
             logger.info(
@@ -140,7 +120,5 @@ class DocumentRepository:
             )
 
         except Exception as ex:
-
             logger.exception("Chunk storage failed.")
-
             raise

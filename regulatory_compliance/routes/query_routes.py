@@ -13,6 +13,5 @@ service = QueryService()
 
 @router.post("/query", response_model=QueryResponse)
 def query_documents(request: QueryRequest):
-
     result = service.process_query(request.question, request.chat_history)
     return result

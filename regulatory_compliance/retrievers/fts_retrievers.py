@@ -7,22 +7,17 @@ from regulatory_compliance.core.db import Database
 class FTSRetriever:
     """
     PostgreSQL Full Text Search Retriever.
-
     Uses:
     - PostgreSQL tsvector
     - ts_rank_cd
     """
 
     def __init__(self, top_k: int = 5):
-
         self.top_k = top_k
 
     def search(self, query: str) -> List[Document]:
-
         sql = """
-
         SELECT
-
             content,
             document_id,
             chunk_index,
@@ -33,7 +28,6 @@ class FTSRetriever:
                     'english',
                     %s
                 )
-
             ) AS fts_score
 
         FROM document_chunks
@@ -45,21 +39,16 @@ class FTSRetriever:
         ORDER BY
             fts_score DESC
         LIMIT %s
-
         """
 
         documents = []
 
         with Database.get_connection() as conn:
-
             with conn.cursor() as cur:
-
                 cur.execute(sql, (query, query, self.top_k))
-
                 rows = cur.fetchall()
 
         for row in rows:
-
             content = row[0]
             document_id = row[1]
             chunk_index = row[2]
