@@ -80,7 +80,7 @@ def fts_search_tool(query: str):
     - "RBI circular DBR..."
     - "Master Direction KYC"
     - "IRAC norms"
-    The user expects exact matching content.
+    The user expects exact matching content with 1 documet citations only.
     Do not use this tool for:
     - explain
     - describe
