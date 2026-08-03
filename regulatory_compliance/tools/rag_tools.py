@@ -1,34 +1,21 @@
 import json
 from langchain_core.tools import tool
-
 from regulatory_compliance.retrievers.vector_retrievers import VectorRetriever
 from regulatory_compliance.retrievers.fts_retrievers import FTSRetriever
 from regulatory_compliance.retrievers.hybrid_retrievers import HybridRetriever
 
 vector_retriever = VectorRetriever(top_k=5)
-
 fts_retriever = FTSRetriever(top_k=5)
-
 hybrid_retriever = HybridRetriever(top_k=5)
 
 
-# temporary storage for citation metadata
-# retrieval_metadata = []
-
-
 def format_documents(documents):
-
-    # global retrieval_metadata
-
-    # retrieval_metadata = []
 
     context = ""
     sources = []
 
     for doc in documents:
-
         metadata = doc.metadata
-
         sources.append(
             {
                 "document_id": metadata.get("document_id"),
@@ -44,20 +31,14 @@ def format_documents(documents):
                 "snippet": doc.page_content[:300],
             }
         )
-
         context += f"""
-
 Document:
 {metadata.get('file_name')}
-
 Page:
 {metadata.get('page_number')}
-
 Content:
 {doc.page_content}
-
 """
-
     return {"context": context, "sources": sources}
 
 
@@ -65,7 +46,6 @@ Content:
 def vector_search_tool(query: str):
     """
      Use this tool for semantic understanding.
-
      Use when user asks:
      - explain
      - meaning
@@ -75,12 +55,11 @@ def vector_search_tool(query: str):
      - provide understanding of compliance concept
 
     This tool performs semantic similarity search.
+    Do not use for exact document lookup.
     """
 
     docs = vector_retriever.search(query)
-
     result = format_documents(docs)
-
     return json.dumps(
         {
             "context": result["context"],
@@ -93,23 +72,24 @@ def vector_search_tool(query: str):
 @tool
 def fts_search_tool(query: str):
     """
-    Use this tool for exact document lookup.
-
-    Use when user asks for:
-    - exact clause
-    - section number
-    - paragraph
-    - circular number
-    - specific keyword
-    - exact wording
-
-    This tool performs keyword based search.
+    Use this tool ONLY when the user query is a lookup request.
+    Examples:
+    - "KYC"
+    - "BASEL III"
+    - "section 4.2"
+    - "RBI circular DBR..."
+    - "Master Direction KYC"
+    - "IRAC norms"
+    The user expects exact matching content.
+    Do not use this tool for:
+    - explain
+    - describe
+    - why
+    - meaning
     """
 
     docs = fts_retriever.search(query)
-
     result = format_documents(docs)
-
     return json.dumps(
         {
             "context": result["context"],
@@ -123,21 +103,17 @@ def fts_search_tool(query: str):
 def hybrid_search_tool(query: str):
     """
     Use this tool for general regulatory questions.
-
     Combines:
     - keyword search
     - semantic vector search
-
     Use when user asks about:
     - general compliance questions
     - regulatory guidance
     - uploaded document questions
-
     This combines vector similarity and keyword search
     """
 
     docs = hybrid_retriever.search(query)
-
     result = format_documents(docs)
     return json.dumps(
         {

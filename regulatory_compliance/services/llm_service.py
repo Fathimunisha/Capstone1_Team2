@@ -3,9 +3,7 @@ from regulatory_compliance.core.config import settings
 
 
 class LLMService:
-
     def __init__(self):
-
         self.llm = ChatOpenAI(
             model=settings.OPENAI_MODEL,
             api_key=settings.OPENAI_API_KEY,
@@ -14,5 +12,4 @@ class LLMService:
         )
 
     def get_llm(self):
-
         return self.llm

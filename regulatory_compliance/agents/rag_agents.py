@@ -3,27 +3,22 @@ import time
 import json
 from langsmith import traceable
 from regulatory_compliance.services.llm_service import LLMService
+from langchain.agents import create_agent
 from regulatory_compliance.tools.rag_tools import (
     vector_search_tool,
     fts_search_tool,
     hybrid_search_tool,
 )
-from langchain.agents import create_agent
+
+llm = LLMService().get_llm()
 
 
-class RAGAgent:
+rag_agent = create_agent(
+    model=llm,
+    tools=[vector_search_tool, fts_search_tool, hybrid_search_tool],
+    system_prompt="""
 
-    def __init__(self):
-
-        self.llm = LLMService().get_llm()
-
-        self.agent = create_agent(
-            model=self.llm,
-            tools=[vector_search_tool, fts_search_tool, hybrid_search_tool],
-            system_prompt="""
-            You are a Regulatory Compliance AI Assistant.
-        
-You have two modes:
+You are a Regulatory Compliance AI Assistant.
 
 MODE 1: Conversation
 
@@ -34,16 +29,13 @@ For:
 - thanks
 - casual conversation
 
-Do not call any tool.
+Do not call tools.
 
 Use previous conversation history.
-
----------------------------------
-
+--------------------------------
 MODE 2: Regulatory Document Question
 
 For questions related to:
-
 - RBI
 - SEBI
 - Basel
@@ -54,161 +46,118 @@ For questions related to:
 - Lending regulations
 - Uploaded documents
 
+Tool Rules:
 You MUST call exactly ONE tool.
 
-Tool selection:
-
-fts_search_tool:
-Use when query contains:
+1. fts_search_tool:
+    Use for:
 - exact section
+- exact keyword
 - clause
 - paragraph
-- keyword lookup
 - specific phrase
 
-
-vector_search_tool:
-Use when user asks:
+2. vector_search_tool:
+    Use for:
 - explain
 - meaning
 - interpretation
 - concept
 
-hybrid_search_tool:
-Use for all other regulatory questions.
+3. hybrid_search_tool:
+    Use for all other regulatory questions.
 
 After retrieving documents:
-
 - Answer only from retrieved documents.
-- Never use previous answers as regulatory source.
 - Never hallucinate.
-- If information missing:
+- Do not use previous answers as source.
 
-"Information is not available in the provided documents."
-
----------------------------------
-
-IMPORTANT CURRENT QUERY RULE:
-
-The latest user message always has highest priority.
-
-Do not classify the current question based on previous conversation.
-
-Use chat history only for:
-- user identity
-- greetings
-- casual references like "what did I say?"
-
-MODE 3: General knowledge
-
-Do not call tools.
-
+If information is missing:
 Reply:
-
+"Information is not available in the provided documents."
+---------------------------------
+IMPORTANT:
+Latest user question has highest priority.
+Do not classify current question using previous conversation.
+Use history only for:
+- identity
+- greetings
+- casual references
+---------------------------------
+MODE 3: General knowledge
+Do not call tools.
+Reply:
 "I am a Regulatory Compliance assistant and can help only with regulatory documents and compliance related questions."
 
----------------------------------
-
 Keep answers concise.
-
 """,
-        )
+)
 
-    def build_context(self, documents):
-        """
-        Build retrieved context for LangSmith evaluation.
-        """
 
-        context = ""
+def build_context(documents):
+    context = ""
+    for index, doc in enumerate(documents, start=1):
+        metadata = doc.metadata
+        context += f"""
+--- Document {index} ---
+Document ID:
+{metadata.get("document_id")}
+File Name:
+{metadata.get("file_name")}
+Page Number:
+{metadata.get("page_number")}
+Section:
+{metadata.get("section_number")}
+Regulation Type:
+{metadata.get("regulation_type")}
+Content:
+{doc.page_content}
 
-        for index, doc in enumerate(documents, start=1):
+"""
+    return context
 
-            metadata = doc.metadata
 
-            context += f"""
+@traceable(name="rag_agent")
+def run_agent(question: str, chat_history=None):
+    start_time = time.time()
+    messages = []
+    if chat_history:
+        for msg in chat_history:
+            if msg["role"] == "user":
+                messages.append(HumanMessage(content=msg["content"]))
+            elif msg["role"] == "assistant":
+                messages.append(AIMessage(content=msg["content"]))
 
-    --- Document {index} ---
+    # prevent duplicate question
+    if not messages or messages[-1].content != question:
+        messages.append(HumanMessage(content=question))
 
-    Document ID:
-    {metadata.get("document_id")}
+    response = rag_agent.invoke({"messages": messages})
 
-    File Name:
-    {metadata.get("file_name")}
+    tool_used = None
+    sources = []
+    context = ""
 
-    Page Number:
-    {metadata.get("page_number")}
+    for message in response["messages"]:
+        if message.type == "tool":
+            try:
+                tool_response = json.loads(message.content)
+                tool_used = tool_response.get("tool_used")
+                sources = tool_response.get("sources", [])
+                context += tool_response.get("context", "")
+            except Exception:
+                context += str(message.content)
 
-    Section:
-    {metadata.get("section_number")}
+    answer = response["messages"][-1].content
 
-    Regulation Type:
-    {metadata.get("regulation_type")}
-
-    Content:
-
-    {doc.page_content}
-
-    """
-
-        return context
-
-    @traceable(name="rag_agent")
-    def run(self, question: str, chat_history=None):
-
-        start_time = time.time()
-
-        messages = []
-
-        if chat_history:
-
-            for msg in chat_history:
-
-                if msg["role"] == "user":
-                    messages.append(HumanMessage(content=msg["content"]))
-
-                elif msg["role"] == "assistant":
-
-                    messages.append(AIMessage(content=msg["content"]))
-
-        # avoid duplicate current question
-        if not messages or messages[-1].content != question:
-
-            messages.append(HumanMessage(content=question))
-
-        response = self.agent.invoke({"messages": messages})
-
-        tool_used = None
-        sources = []
-        context = ""
-
-        for message in response["messages"]:
-
-            if message.type == "tool":
-
-                try:
-
-                    tool_response = json.loads(message.content)
-
-                    tool_used = tool_response.get("tool_used")
-
-                    sources = tool_response.get("sources", [])
-
-                    context += tool_response.get("context", "")
-
-                except Exception:
-
-                    context += str(message.content)
-
-        answer = response["messages"][-1].content
-
-        return {
-            "answer": answer,
-            "inputs": {"question": question},
-            "outputs": {"answer": answer},
-            "context": context,
-            "query_type": ("rag" if tool_used else "conversation"),
-            "tool_used": tool_used,
-            "sources": sources,
-            "latency_ms": round((time.time() - start_time) * 1000, 2),
-            "confidence": 0.85,
-        }
+    return {
+        "answer": answer,
+        "inputs": {"question": question},
+        "outputs": {"answer": answer},
+        "context": context,
+        "query_type": "rag" if tool_used else "conversation",
+        "tool_used": tool_used,
+        "sources": sources,
+        "latency_ms": round((time.time() - start_time) * 1000, 2),
+        "confidence": 0.85,
+    }

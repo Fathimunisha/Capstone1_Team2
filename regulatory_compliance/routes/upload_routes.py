@@ -10,6 +10,5 @@ async def upload_pdf(file: UploadFile = File(...)):
     """
     Upload a regulatory compliance PDF.
     """
-
     response = await UploadService.upload_pdf(file)
     return response

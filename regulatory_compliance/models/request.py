@@ -32,6 +32,5 @@ class UploadRequest(BaseModel):
 
 
 class QueryRequest(BaseModel):
-
     question: str
     chat_history: List[Dict] = []
