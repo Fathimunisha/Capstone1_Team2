@@ -10,10 +10,8 @@ hybrid_retriever = HybridRetriever(top_k=5)
 
 
 def format_documents(documents):
-
     context = ""
     sources = []
-
     for doc in documents:
         metadata = doc.metadata
         sources.append(
@@ -53,20 +51,16 @@ def vector_search_tool(query: str):
      - why
      - how does regulation work
      - provide understanding of compliance concept
-
     This tool performs semantic similarity search.
     Do not use for exact document lookup.
     """
-
     docs = vector_retriever.search(query)
     result = format_documents(docs)
-    return json.dumps(
-        {
-            "context": result["context"],
-            "sources": result["sources"],
-            "tool_used": "vector_search",
-        }
-    )
+    return {
+        "context": result["context"],
+        "sources": result["sources"],
+        "tool_used": "vector_search",
+    }
 
 
 @tool
@@ -80,7 +74,7 @@ def fts_search_tool(query: str):
     - "RBI circular DBR..."
     - "Master Direction KYC"
     - "IRAC norms"
-    The user expects exact matching content.
+    The user expects exact matching content with 1 documet citations only.
     Do not use this tool for:
     - explain
     - describe
@@ -90,13 +84,11 @@ def fts_search_tool(query: str):
 
     docs = fts_retriever.search(query)
     result = format_documents(docs)
-    return json.dumps(
-        {
-            "context": result["context"],
-            "sources": result["sources"],
-            "tool_used": "fts_search",
-        }
-    )
+    return {
+        "context": result["context"],
+        "sources": result["sources"],
+        "tool_used": "fts_search",
+    }
 
 
 @tool
@@ -115,10 +107,8 @@ def hybrid_search_tool(query: str):
 
     docs = hybrid_retriever.search(query)
     result = format_documents(docs)
-    return json.dumps(
-        {
-            "context": result["context"],
-            "sources": result["sources"],
-            "tool_used": "hybrid_search",
-        }
-    )
+    return {
+        "context": result["context"],
+        "sources": result["sources"],
+        "tool_used": "hybrid_search",
+    }
